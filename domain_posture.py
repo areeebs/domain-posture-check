@@ -110,19 +110,21 @@ def fetch_https(hostname: str, address: str, timeout: float) -> tuple[int, dict[
     connection = _PinnedHTTPSConnection(hostname, address, timeout, context)
     try:
         connection.request("GET", "/", headers={"User-Agent": f"DomainPosture/{VERSION}", "Accept": "text/html,*/*;q=0.2", "Connection": "close"})
-        response = connection.getresponse()
         if connection.sock is None:
             raise ScanError("TLS connection ended before its certificate could be inspected.")
+        # Capture TLS metadata immediately after the handshake; servers may close
+        # the socket as soon as the HTTP response is delivered.
         certificate = connection.sock.getpeercert()
         expiry_text = certificate.get("notAfter")
         if not expiry_text:
             raise ScanError("The TLS certificate did not include an expiry time.")
         expiry = dt.datetime.fromtimestamp(ssl.cert_time_to_seconds(expiry_text), tz=dt.timezone.utc)
+        tls_version = connection.sock.version()
+        response = connection.getresponse()
         headers: dict[str, str] = {}
         for key, value in response.getheaders():
             lowered = key.lower()
             headers[lowered] = f"{headers[lowered]}, {value}" if lowered in headers else value
-        tls_version = connection.sock.version()
         status = response.status
         response.close()
         return status, headers, tls_version or "unknown", expiry

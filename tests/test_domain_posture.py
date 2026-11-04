@@ -120,7 +120,9 @@ class DomainPostureTests(unittest.TestCase):
                 self.request_args = (args, kwargs)
 
             def getresponse(self):
-                return FakeResponse()
+                response = FakeResponse()
+                self.sock = None
+                return response
 
             def close(self):
                 pass
